@@ -1,0 +1,18 @@
+"use client";
+
+import { useState } from "react";
+import { Check, CircleDollarSign, Plus, ShieldCheck } from "lucide-react";
+import { accounts as initialAccounts } from "@/data/finance";
+import type { Account } from "@/types/finance";
+import { AccountCard } from "@/components/finance/account-card";
+import { Modal } from "@/components/ui/modal";
+import { PageHeader } from "@/components/page-header";
+
+export function AccountsScreen() {
+  const [accounts, setAccounts] = useState(initialAccounts);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [type, setType] = useState<Account["type"]>("Checking");
+  const addAccount = () => { if (!name.trim()) return; setAccounts((items) => [...items, { id: crypto.randomUUID(), name, type, institution: "Connection pending", currency: "EUR", balance: 0, lastSynced: "Not connected", ending: "•• ••••", color: "#0891b2" }]); setOpen(false); setName(""); };
+  return <div className="space-y-6 lg:space-y-8"><PageHeader eyebrow="Connected accounts" title="Accounts" description="A complete view of the financial accounts in your workspace." actions={<button onClick={() => setOpen(true)} className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground shadow-sm"><Plus className="size-4" />Add account</button>} /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{accounts.map((account) => <AccountCard key={account.id} account={account} />)}</div><section className="grid gap-4 rounded-2xl border bg-card p-5 shadow-[0_2px_10px_rgba(23,32,51,.025)] md:grid-cols-[auto_1fr_auto] md:items-center sm:p-6"><span className="grid size-11 place-items-center rounded-xl bg-emerald-500/10 text-emerald-600"><ShieldCheck className="size-5" /></span><div><h2 className="font-semibold">Your data stays protected</h2><p className="mt-1 text-sm text-muted-foreground">Bank connections will use encrypted, read-only access when your financial provider integration is available.</p></div><button className="h-9 rounded-lg border px-3 text-sm font-medium hover:bg-muted">Learn about connections</button></section><Modal open={open} onClose={() => setOpen(false)} title="Add an account" description="Choose an account type now; bank linking will be added later."><form className="space-y-4" onSubmit={(event) => { event.preventDefault(); addAccount(); }}><label className="block text-sm font-medium">Account name<input value={name} onChange={(event) => setName(event.target.value)} autoFocus placeholder="e.g. Emergency Fund" className="mt-1.5 h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" /></label><label className="block text-sm font-medium">Account type<select value={type} onChange={(event) => setType(event.target.value as Account["type"])} className="mt-1.5 h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none focus:border-primary">{["Checking", "Savings", "Business", "Credit", "Investment"].map((item) => <option key={item}>{item}</option>)}</select></label><div className="rounded-xl bg-muted/60 p-3 text-sm text-muted-foreground"><CircleDollarSign className="mr-2 inline size-4 text-primary" />No credentials are requested in this presentation build.</div><div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setOpen(false)} className="h-9 rounded-lg px-3 text-sm font-medium hover:bg-muted">Cancel</button><button className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"><Check className="size-4" />Add account</button></div></form></Modal></div>;
+}

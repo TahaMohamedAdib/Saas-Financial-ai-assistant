@@ -1,0 +1,5 @@
+import { Download, Plus } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
+import { TransactionTable } from "@/components/finance/transaction-table";
+
+export function TransactionsScreen() { return <div className="space-y-6 lg:space-y-8"><PageHeader eyebrow="All activity" title="Transactions" description="Search, inspect, and organize financial activity from every account." actions={<><button className="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium hover:bg-muted"><Download className="size-4" />Export</button><button className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"><Plus className="size-4" />Add transaction</button></>} /><div className="rounded-xl border border-primary/15 bg-primary/[.035] px-4 py-3 text-sm text-muted-foreground"><span className="font-semibold text-foreground">October activity:</span> €9,100 in income and €4,550 in expenses across 5 accounts.</div><TransactionTable /></div>; }
