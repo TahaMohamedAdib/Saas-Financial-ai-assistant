@@ -5,8 +5,10 @@ export type {
   AIInsight,
   AIResponse,
   AssistantBlock,
+  ClientTokenQuota,
   ChatMessage,
   Conversation,
   SendMessageInput,
   SuggestedAction,
+  TokenUsage,
 } from "@/contracts/assistant";

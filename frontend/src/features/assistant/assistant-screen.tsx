@@ -6,11 +6,23 @@ import { ArrowLeft, Bot, ChevronDown, FileUp, MessageSquarePlus, MoreHorizontal,
 import { AssistantBlocks } from "@/components/ai/assistant-blocks";
 import { AssistantMessageContent } from "@/components/ai/assistant-message-content";
 import { initialConversations, suggestedPrompts } from "@/data/conversations";
+import { AssistantShortcuts } from "@/features/assistant/assistant-shortcuts";
 import { cn } from "@/lib/utils";
 import { assistantClient } from "@/features/assistant/assistant-client";
-import type { ChatMessage, Conversation } from "@/types/assistant";
+import type { ChatMessage, Conversation, TokenUsage } from "@/types/assistant";
 
 const conversationDate = (value: string) => value.slice(5, 10).replace("-", "/");
+
+// L'authentification fournira cet identifiant réel lorsqu'elle sera intégrée.
+const DEMO_CLIENT_ID = "workspace-alex-morgan";
+
+function formatTokenUsage(usage: TokenUsage) {
+  // Une réponse conservée avant l'ajout du quota reste lisible au lieu de faire planter le chat.
+  const quota = usage.quota ? ` · quota : ${usage.quota.usedTokens}/${usage.quota.limitTokens}` : "";
+  return usage.source === "guardrail"
+    ? `0 token Groq · demande filtrée${quota}`
+    : `${usage.promptTokens} entrée · ${usage.completionTokens} sortie · ${usage.totalTokens} tokens${quota}`;
+}
 
 function AssistantMark({ className }: { className?: string }) {
   return <span className={cn("ai-mark grid size-7 shrink-0 place-items-center rounded-lg text-white", className)}><Bot className="size-3.5" /></span>;
@@ -27,6 +39,7 @@ export function AssistantScreen() {
   const active = useMemo(() => conversations.find((item) => item.id === activeId) ?? conversations[0], [activeId, conversations]);
 
   useEffect(() => {
+    // Garde la dernière réponse visible sans créer une deuxième barre de défilement.
     const container = scrollContainerRef.current;
     if (!container) return;
     container.scrollTo({ top: container.scrollHeight, behavior: active.messages.length > 2 ? "smooth" : "auto" });
@@ -63,6 +76,7 @@ export function AssistantScreen() {
       createdAt: new Date().toISOString(),
     };
 
+    // Affiche immédiatement le message de l’utilisateur pendant que FastAPI prépare la réponse.
     setConversations((current) => current.map((item) => item.id === activeId
       ? {
           ...item,
@@ -78,16 +92,18 @@ export function AssistantScreen() {
 
     try {
       const response = await assistantClient.sendMessage({
+        clientId: DEMO_CLIENT_ID,
         message: content,
         conversationId: activeId,
+        // Le backend ajoute la question actuelle ; on envoie seulement les messages précédents pour éviter un doublon.
         history: active.messages.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
       });
       setConversations((current) => current.map((item) => item.id === activeId
         ? { ...item, messages: [...item.messages, response.message], updatedAt: new Date().toISOString() }
         : item,
       ));
-    } catch {
-      setServiceError("Ledgerly AI could not respond just now. Please try again.");
+    } catch (error) {
+      setServiceError(error instanceof Error ? error.message : "Ledgerly AI could not respond just now. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -164,7 +180,7 @@ export function AssistantScreen() {
         </header>
 
         <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[760px] px-5 pb-40 pt-7 sm:px-8 sm:pt-10">
+          <div className="mx-auto w-full max-w-[760px] px-5 pb-64 pt-7 sm:px-8 sm:pt-10">
             {active.messages.length === 0 ? (
               <div className="flex min-h-[calc(100vh-15rem)] flex-col justify-center pb-12">
                 <AssistantMark className="mx-auto size-10 rounded-xl shadow-[0_8px_24px_rgba(99,91,255,.28)]" />
@@ -189,6 +205,15 @@ export function AssistantScreen() {
                         <div className="min-w-0 pt-0.5">
                           <div className="mb-2 flex items-center gap-2"><p className="text-sm font-semibold">Ledgerly</p><span className="text-[11px] text-muted-foreground">Financial intelligence</span></div>
                           <div className="text-[15px] leading-7 text-foreground"><AssistantMessageContent content={message.content} />{message.blocks && <AssistantBlocks blocks={message.blocks} />}</div>
+                          {message.usage && (
+                            // Ce résumé correspond aux tokens de la réponse générée pour ce prompt.
+                            <p
+                              className="mt-3 text-[11px] leading-4 text-muted-foreground"
+                              title={message.usage.source === "groq" ? "Les tokens d’entrée incluent le contexte et les instructions système." : "La demande a été filtrée avant l’appel à Groq."}
+                            >
+                              {formatTokenUsage(message.usage)}
+                            </p>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -210,6 +235,7 @@ export function AssistantScreen() {
 
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-white from-55% via-white/95 to-transparent px-4 pb-3 pt-16 dark:from-[#212121] dark:via-[#212121]/95 sm:px-6 sm:pb-4">
           <div className="mx-auto max-w-[760px]">
+            <AssistantShortcuts disabled={isLoading} onSelect={submit} />
             {serviceError && <div role="alert" className="mb-2 flex items-center justify-between gap-3 rounded-lg border border-negative/25 bg-negative/10 px-3 py-2 text-xs text-foreground"><span>{serviceError}</span><button onClick={() => setServiceError(null)} aria-label="Dismiss error" className="text-muted-foreground hover:text-foreground"><X className="size-3.5" /></button></div>}
             <form onSubmit={(event) => { event.preventDefault(); submit(); }} className="flex items-end gap-2 rounded-[25px] border border-black/[.10] bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,.08)] transition-shadow focus-within:border-primary/60 focus-within:shadow-[0_0_0_3px_rgba(99,91,255,.13)] dark:border-white/[.12] dark:bg-[#2f2f2f] dark:shadow-[0_8px_30px_rgba(0,0,0,.20)]">
               <button type="button" aria-label="Attach document" className="mb-0.5 grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-black/[.06] hover:text-foreground dark:hover:bg-white/[.08]"><FileUp className="size-[17px]" /></button>

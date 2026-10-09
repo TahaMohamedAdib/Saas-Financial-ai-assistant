@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 def get_financial_demo_context() -> str:
-    """A replaceable adapter for the application's real financial data source."""
+    # Plus tard, cet échantillon contrôlé sera remplacé par une base de données ou une API bancaire.
     return """DEMONSTRATION DATA ONLY — do not present these figures as the user's live data.
 
 October operating snapshot:

@@ -16,7 +16,8 @@ backend/ — FastAPI / Python
   app/main.py                                  Routes HTTP et CORS
   app/models.py                                Validation Pydantic + contrat JSON
   app/services/assistant_service.py            Cas d’usage
-  app/services/guardrails.py                   Règles métier et anti-discrimination
+  app/services/token_quota.py                  Quota de tokens par client
+  app/services/guardrails.py                   Règles métier, langue et anti-discrimination
   app/data/demo_context.py                     Données financières de démonstration
   app/services/groq_provider.py                Appel sécurisé vers Groq
   │
@@ -42,6 +43,7 @@ Le frontend n’a aucune route `/api/assistant`. Il appelle FastAPI directement.
 
 ```json
 {
+  "client_id": "workspace-alex-morgan",
   "conversation_id": "conversation-uuid",
   "message": "Analyse mes dépenses de ce mois",
   "history": [
@@ -60,21 +62,39 @@ Le frontend n’a aucune route `/api/assistant`. Il appelle FastAPI directement.
     "id": "message-uuid",
     "role": "assistant",
     "content": "Voici une synthèse…",
-    "createdAt": "2026-10-09T12:00:00+00:00"
+    "createdAt": "2026-10-09T12:00:00+00:00",
+    "usage": {
+      "promptTokens": 240,
+      "completionTokens": 96,
+      "totalTokens": 336,
+      "source": "groq",
+      "quota": {
+        "clientId": "workspace-alex-morgan",
+        "limitTokens": 20000,
+        "usedTokens": 336,
+        "remainingTokens": 19664
+      }
+    }
   }
 }
 ```
 
-Les types Pydantic dans `backend/app/models.py` contrôlent la requête et la réponse ; FastAPI publie automatiquement ce contrat dans `/docs`.
+Les types Pydantic dans `backend/app/models.py` contrôlent la requête et la réponse ; FastAPI publie automatiquement ce contrat dans `/docs`. `promptTokens` inclut les instructions système et l’historique transmis au modèle. Une demande refusée par le garde-fou retourne `source: "guardrail"` et trois compteurs à zéro, car Groq n’est pas appelé.
+
+## Quota par client
+
+`token_quota.py` cumule les tokens réellement retournés par Groq pour chaque `client_id`. Le plafond est configuré avec `ASSISTANT_TOKENS_PER_CLIENT` (20&nbsp;000 par défaut) et la réponse affiche le cumul restant. Une fois le plafond atteint, FastAPI répond `HTTP 429` sans contacter Groq. Pendant la démo, le stockage est en mémoire : il revient donc à zéro au redémarrage. Une intégration PostgreSQL ou Redis pourra remplacer ce service sans modifier le frontend.
 
 ## Parcours d’une question
 
 1. `assistant-screen.tsx` construit le message et l’historique de la conversation.
 2. `assistant-client.ts` appelle l’API FastAPI avec `fetch`.
 3. `main.py` valide le JSON avec `AssistantRequest` et autorise seulement l’origine frontend configurée.
-4. `assistant_service.py` bloque une demande discriminatoire avant tout appel au modèle.
+4. `assistant_service.py` bloque une demande discriminatoire avant tout appel au modèle, adapte la réponse locale à la langue détectée et consulte le quota du client.
 5. Pour une demande autorisée, le backend ajoute uniquement le contexte de démonstration autorisé et appelle Groq.
-6. La réponse respecte le contrat JSON, puis React l’affiche dans le fil de discussion.
+6. Les tokens réels débitent le quota du client ; la réponse respecte le contrat JSON, puis React l’affiche dans le fil de discussion.
+
+Le prompt système impose aussi la langue du dernier message utilisateur à la réponse Groq. Ainsi, les instructions internes en anglais et les données de démonstration ne changent pas la langue choisie par le client.
 
 ## Comment l’expliquer en 30 secondes
 

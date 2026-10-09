@@ -1,6 +1,6 @@
 import type { AIResponse, ChatMessage, SendMessageInput } from "@/contracts/assistant";
 
-/** Browser-facing contract. This file never imports server code or API keys. */
+/** Contrat utilisé par le navigateur : ce fichier ne contient ni code serveur ni clé API. */
 export interface AssistantClient {
   sendMessage(input: SendMessageInput): Promise<AIResponse>;
 }
@@ -19,21 +19,29 @@ export const mockAssistantClient: AssistantClient = {
   },
 };
 
-/** HTTP-only adapter for the separately deployed FastAPI backend. */
+/** Adaptateur HTTP vers le backend FastAPI déployé séparément. */
 export class FastApiAssistantClient implements AssistantClient {
   constructor(private readonly baseUrl = process.env.NEXT_PUBLIC_AI_API_URL ?? "http://localhost:8000") {}
 
-  async sendMessage({ message, conversationId, history = [] }: SendMessageInput): Promise<AIResponse> {
+  async sendMessage({ clientId, message, conversationId, history = [] }: SendMessageInput): Promise<AIResponse> {
+    // C’est l’unique appel navigateur → backend ; Groq reste isolé dans FastAPI.
     const response = await fetch(`${this.baseUrl}/v1/assistant/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversation_id: conversationId, message, history }),
+      body: JSON.stringify({ client_id: clientId, conversation_id: conversationId, message, history }),
     });
-    if (!response.ok) throw new Error(`FastAPI assistant request failed (${response.status})`);
+    if (!response.ok) {
+      const payload: unknown = await response.json().catch(() => null);
+      const detail = typeof payload === "object" && payload !== null && "detail" in payload && typeof payload.detail === "string"
+        ? payload.detail
+        : `FastAPI assistant request failed (${response.status})`;
+      throw new Error(detail);
+    }
     return response.json() as Promise<AIResponse>;
   }
 }
 
+// Le mode mock permet de présenter l’interface même si l’API Python est arrêtée.
 export const assistantClient: AssistantClient = process.env.NEXT_PUBLIC_AI_PROVIDER === "fastapi"
     ? new FastApiAssistantClient()
     : mockAssistantClient;
