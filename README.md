@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ledgerly Business
 
-## Getting Started
+Ledgerly is a financial SaaS demonstration split into two independent applications:
 
-First, run the development server:
+| Application | Responsibility | Technology |
+| --- | --- | --- |
+| [`frontend/`](frontend) | SaaS interface, dashboard, chat UX and browser HTTP calls | Next.js 16, React 19, TypeScript, Tailwind |
+| [`backend/`](backend) | Assistant API, safety rules, demo financial context and Groq integration | FastAPI, Python |
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+The browser never has access to `GROQ_API_KEY`. The key lives only in `backend/.env`, which is ignored by Git.
+
+## Start locally
+
+Open two terminals from this repository root.
+
+```powershell
+# Terminal 1 — FastAPI
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+uvicorn app.main:app --reload --port 8000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Set the Groq key in `backend/.env`. Do not put it in the frontend.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```powershell
+# Terminal 2 — Next.js
+cd frontend
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000). The FastAPI health check is at [http://localhost:8000/health](http://localhost:8000/health), and its interactive API documentation is at [http://localhost:8000/docs](http://localhost:8000/docs).
 
-## Learn More
+## Configuration
 
-To learn more about Next.js, take a look at the following resources:
+`frontend/.env.local` contains only public browser settings:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```env
+NEXT_PUBLIC_AI_PROVIDER=fastapi
+NEXT_PUBLIC_AI_API_URL=http://localhost:8000
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+`backend/.env` contains the private server settings; start from `backend/.env.example`.
 
-## Deploy on Vercel
+## Explaining the design
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Read [the architecture guide](docs/assistant-architecture.md) for the HTTP contract and a short presentation script. The professor-facing Python notebook is at [backend/notebooks/assistant_demo.ipynb](backend/notebooks/assistant_demo.ipynb).

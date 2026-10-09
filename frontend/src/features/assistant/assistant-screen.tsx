@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Bot, ChevronDown, FileUp, MessageSquarePlus, MoreHorizontal, PanelLeft, SendHorizontal, X } from "lucide-react";
 import { AssistantBlocks } from "@/components/ai/assistant-blocks";
+import { AssistantMessageContent } from "@/components/ai/assistant-message-content";
 import { initialConversations, suggestedPrompts } from "@/data/conversations";
 import { cn } from "@/lib/utils";
-import { aiService } from "@/services/ai-service";
+import { assistantClient } from "@/features/assistant/assistant-client";
 import type { ChatMessage, Conversation } from "@/types/assistant";
 
 const conversationDate = (value: string) => value.slice(5, 10).replace("-", "/");
@@ -76,7 +77,11 @@ export function AssistantScreen() {
     setIsLoading(true);
 
     try {
-      const response = await aiService.sendMessage({ message: content, conversationId: activeId });
+      const response = await assistantClient.sendMessage({
+        message: content,
+        conversationId: activeId,
+        history: active.messages.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
+      });
       setConversations((current) => current.map((item) => item.id === activeId
         ? { ...item, messages: [...item.messages, response.message], updatedAt: new Date().toISOString() }
         : item,
@@ -153,7 +158,7 @@ export function AssistantScreen() {
         <header className="flex h-14 shrink-0 items-center justify-between px-3 sm:px-5">
           <div className="flex items-center gap-1">
             <button onClick={() => setSidebarOpen(true)} aria-label="Open conversation history" className="grid size-9 place-items-center rounded-lg text-muted-foreground hover:bg-black/[.05] dark:hover:bg-white/[.07] md:hidden"><PanelLeft className="size-[17px]" /></button>
-            <button className="flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm font-medium hover:bg-black/[.05] dark:hover:bg-white/[.07]">Ledgerly <span className="text-muted-foreground">Finance</span><ChevronDown className="size-3.5 text-muted-foreground" /></button>
+            <button className="flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm font-medium hover:bg-black/[.05] dark:hover:bg-white/[.07]">Ledgerly <span className="text-muted-foreground">Business</span><ChevronDown className="size-3.5 text-muted-foreground" /></button>
           </div>
           <button className="grid size-9 place-items-center rounded-lg text-muted-foreground hover:bg-black/[.05] dark:hover:bg-white/[.07]" aria-label="Conversation options"><MoreHorizontal className="size-[18px]" /></button>
         </header>
@@ -164,7 +169,7 @@ export function AssistantScreen() {
               <div className="flex min-h-[calc(100vh-15rem)] flex-col justify-center pb-12">
                 <AssistantMark className="mx-auto size-10 rounded-xl shadow-[0_8px_24px_rgba(99,91,255,.28)]" />
                 <h1 className="mt-5 text-center text-3xl font-semibold tracking-[-.055em] sm:text-[34px]">What would you like to understand?</h1>
-                <p className="mx-auto mt-3 max-w-md text-center text-[15px] leading-6 text-muted-foreground">I can help turn your financial activity into clear next steps.</p>
+                <p className="mx-auto mt-3 max-w-md text-center text-[15px] leading-6 text-muted-foreground">Ask about finance, sales, marketing, operations, strategy, or your Ledgerly workspace.</p>
                 <div className="mx-auto mt-8 grid w-full max-w-[680px] gap-2.5 sm:grid-cols-2">
                   {suggestedPrompts.map((prompt) => (
                     <button key={prompt.id} onClick={() => submit(prompt.label)} className="rounded-xl border border-black/[.08] bg-white p-3.5 text-left hover:bg-[#f7f7f7] dark:border-white/[.10] dark:bg-[#2a2a2a] dark:hover:bg-[#303030]">
@@ -183,7 +188,7 @@ export function AssistantScreen() {
                         <AssistantMark />
                         <div className="min-w-0 pt-0.5">
                           <div className="mb-2 flex items-center gap-2"><p className="text-sm font-semibold">Ledgerly</p><span className="text-[11px] text-muted-foreground">Financial intelligence</span></div>
-                          <div className="text-[15px] leading-7 text-foreground"><p>{message.content}</p>{message.blocks && <AssistantBlocks blocks={message.blocks} />}</div>
+                          <div className="text-[15px] leading-7 text-foreground"><AssistantMessageContent content={message.content} />{message.blocks && <AssistantBlocks blocks={message.blocks} />}</div>
                         </div>
                       </div>
                     ) : (
@@ -208,7 +213,7 @@ export function AssistantScreen() {
             {serviceError && <div role="alert" className="mb-2 flex items-center justify-between gap-3 rounded-lg border border-negative/25 bg-negative/10 px-3 py-2 text-xs text-foreground"><span>{serviceError}</span><button onClick={() => setServiceError(null)} aria-label="Dismiss error" className="text-muted-foreground hover:text-foreground"><X className="size-3.5" /></button></div>}
             <form onSubmit={(event) => { event.preventDefault(); submit(); }} className="flex items-end gap-2 rounded-[25px] border border-black/[.10] bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,.08)] transition-shadow focus-within:border-primary/60 focus-within:shadow-[0_0_0_3px_rgba(99,91,255,.13)] dark:border-white/[.12] dark:bg-[#2f2f2f] dark:shadow-[0_8px_30px_rgba(0,0,0,.20)]">
               <button type="button" aria-label="Attach document" className="mb-0.5 grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-black/[.06] hover:text-foreground dark:hover:bg-white/[.08]"><FileUp className="size-[17px]" /></button>
-              <textarea value={input} onChange={(event) => setInput(event.target.value)} rows={1} placeholder="Message Ledgerly" className="max-h-32 min-h-8 flex-1 resize-none bg-transparent py-1.5 text-[15px] leading-6 outline-none placeholder:text-muted-foreground" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submit(); } }} />
+              <textarea value={input} onChange={(event) => setInput(event.target.value)} rows={1} placeholder="Ask about your business" className="max-h-32 min-h-8 flex-1 resize-none bg-transparent py-1.5 text-[15px] leading-6 outline-none placeholder:text-muted-foreground" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submit(); } }} />
               <button disabled={!input.trim() || isLoading} aria-label="Send message" className="mb-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-[#1f1f1f] text-white hover:bg-black disabled:cursor-not-allowed disabled:bg-[#e6e6e6] disabled:text-[#9b9b9b] dark:bg-white dark:text-[#202020] dark:hover:bg-[#e7e7e7] dark:disabled:bg-[#444] dark:disabled:text-[#777]"><SendHorizontal className="size-4" /></button>
             </form>
             <p className="mt-2 text-center text-[11px] text-muted-foreground">Ledgerly can make mistakes. Verify important financial decisions.</p>

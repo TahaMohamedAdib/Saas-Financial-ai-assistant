@@ -1,11 +1,7 @@
-import type { AIResponse, ChatMessage, SendMessageInput } from "@/types/assistant";
+import type { AIResponse, ChatMessage, SendMessageInput } from "@/contracts/assistant";
 
-/**
- * The only client-side dependency for the assistant UI.
- * Keep this contract stable and the rendered experience can move from mock data
- * to FastAPI without changing any chat components.
- */
-export interface AIService {
+/** Browser-facing contract. This file never imports server code or API keys. */
+export interface AssistantClient {
   sendMessage(input: SendMessageInput): Promise<AIResponse>;
 }
 
@@ -16,20 +12,28 @@ function mockResponseFor(message: string): ChatMessage {
   return { id: crypto.randomUUID(), role: "assistant", createdAt: new Date().toISOString(), content: "I reviewed your current financial snapshot. Your cash flow remains positive, and the clearest opportunity is to keep discretionary spending aligned with your plan.", blocks: [{ type: "metric", label: "Net cash flow", value: "EUR 4,550", change: "8.4% better than last month", direction: "up" }, { type: "recommendation", title: "Protect your savings momentum", detail: "Move your planned savings transfer soon after income arrives so everyday spending cannot absorb it.", impact: "Keeps EUR 1,547 on track" }] };
 }
 
-export const mockAIService: AIService = { async sendMessage({ message, conversationId }) { await new Promise((resolve) => setTimeout(resolve, 700)); return { conversationId, message: mockResponseFor(message) }; } };
+export const mockAssistantClient: AssistantClient = {
+  async sendMessage({ message, conversationId }) {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    return { conversationId, message: mockResponseFor(message) };
+  },
+};
 
-/** Expected FastAPI endpoint: POST {BASE_URL}/v1/assistant/messages
- * Request body:  { conversation_id: string, message: string }
- * Response body: { conversationId: string, message: ChatMessage }
- */
-export class FastApiAIService implements AIService {
+/** HTTP-only adapter for the separately deployed FastAPI backend. */
+export class FastApiAssistantClient implements AssistantClient {
   constructor(private readonly baseUrl = process.env.NEXT_PUBLIC_AI_API_URL ?? "http://localhost:8000") {}
 
-  async sendMessage({ message, conversationId }: SendMessageInput): Promise<AIResponse> {
-    const response = await fetch(`${this.baseUrl}/v1/assistant/messages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversation_id: conversationId, message }) });
-    if (!response.ok) throw new Error(`AI service request failed (${response.status})`);
+  async sendMessage({ message, conversationId, history = [] }: SendMessageInput): Promise<AIResponse> {
+    const response = await fetch(`${this.baseUrl}/v1/assistant/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversation_id: conversationId, message, history }),
+    });
+    if (!response.ok) throw new Error(`FastAPI assistant request failed (${response.status})`);
     return response.json() as Promise<AIResponse>;
   }
 }
 
-export const aiService: AIService = process.env.NEXT_PUBLIC_AI_PROVIDER === "fastapi" ? new FastApiAIService() : mockAIService;
+export const assistantClient: AssistantClient = process.env.NEXT_PUBLIC_AI_PROVIDER === "fastapi"
+    ? new FastApiAssistantClient()
+    : mockAssistantClient;

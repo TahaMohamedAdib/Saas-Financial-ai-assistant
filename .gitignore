@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/frontend/node_modules
 /.node_modules.corrupt-20261008
 /.pnp
 .pnp.*
@@ -16,6 +17,7 @@
 
 # next.js
 /.next/
+/frontend/.next/
 /out/
 
 # production
@@ -34,6 +36,12 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+/backend/.env
+
+# Python / FastAPI runtime
+/backend/.venv/
+**/__pycache__/
+*.py[cod]
 
 # vercel
 .vercel
